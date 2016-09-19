@@ -1,6 +1,5 @@
 #!/usr/bin/perl
 
-use 5.010;
 use strict;
 use warnings;
 use MIME::Lite;
@@ -8,7 +7,6 @@ use LWP::Simple;
 use File::Basename;
 use POSIX;
 use Switch;
-use Term::ANSIColor;
 
 use JSON::RPC::Client;
 use Data::Dumper;
@@ -81,8 +79,9 @@ my %rx = (
 	'last_value' 			=> '(?<=Last[\s*]value:)\s*(.*?)$'
 );
 
-use constant {
-        MAX_LOG_SIZE => 10
+use constant 
+{
+        MAX_LOG_SIZE => 10 #MB
 		#PERIOD => scalar 3600 #3600 sec is 1 hour, 7200 is 2 hour
 };
 
@@ -135,7 +134,8 @@ my $client = new JSON::RPC::Client;
 ################################################################################
 #Send message
 ################################################################################
-sub send_message {
+sub send_message 
+{
 
     my ($recipient, $from, $subject, $message, $file) = @_;
 	my $body = &create_html($file);
@@ -179,13 +179,13 @@ sub send_message {
 ################################################################################
 #Create HTML
 ################################################################################
-sub create_html {
+sub create_html 
+{
 
 	my ($file)					= @_;
 	
     my $color_trigger_severity 	= $color_trigger_severity{$trigger_nseverity};
     my $color_trigger_value 	= %color_trigger_value{$trigger_value};
-	#my $language = "ru";
 
     my $html = qq{ <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 					<html xmlns="http://www.w3.org/1999/xhtml">
@@ -259,7 +259,8 @@ sub create_html {
 ################################################################################
 #Download graph
 ################################################################################
-sub download_graph {
+sub download_graph 
+{
 
 	my ($file, $graphid) = @_;
 	
@@ -271,7 +272,8 @@ sub download_graph {
 ################################################################################
 #Delete graph
 ################################################################################
-sub delete_file {
+sub delete_file 
+{
 
     my ($file) = @_;
 
@@ -281,9 +283,10 @@ sub delete_file {
 }
 
 ################################################################################
-#Генерация имени файла графика
+#Generation name of graph
 ################################################################################
-sub get_random_prefix {
+sub get_random_prefix 
+{
 
     my $rnd;
 
@@ -295,7 +298,8 @@ sub get_random_prefix {
 ################################################################################
 #Login
 ################################################################################
-sub zabbix_auth {
+sub zabbix_auth 
+{
 
     my $response;
 
@@ -330,7 +334,8 @@ sub zabbix_auth {
 ################################################################################
 #Logout
 ################################################################################
-sub zabbix_logout {
+sub zabbix_logout 
+{
 
     my $response;
 
@@ -355,7 +360,8 @@ sub zabbix_logout {
 ################################################################################
 #Get host id by name
 ################################################################################
-sub zabbix_get_hostid {
+sub zabbix_get_hostid 
+{
 
     my ($host_name) = @_;
 	my $response;
@@ -377,7 +383,8 @@ sub zabbix_get_hostid {
 
 	die "host.get(hostid) failed\n" unless $response->content->{result};
 
-	foreach my $host(@{$response->content->{result}}) {
+	foreach my $host(@{$response->content->{result}}) 
+	{
 		$host_id = $host->{hostid};
 	}
 
@@ -389,9 +396,10 @@ sub zabbix_get_hostid {
 }
 
 ################################################################################
-#Get count graphs about host
+#Get count graphs
 ################################################################################
-sub get_graphs_count {
+sub get_graphs_count 
+{
 
     my ($host_id) = @_;
 	my $graphs_count;
@@ -421,7 +429,7 @@ sub get_graphs_count {
 }
 
 ################################################################################
-#
+#Get graphs
 ################################################################################
 sub get_graphs {
 
@@ -450,9 +458,11 @@ sub get_graphs {
 
 	&write_log_to_file("API* Graphs for $host_name:");
 
-	foreach my $graphs(@{$response->content->{result}}) {
+	foreach my $graphs(@{$response->content->{result}}) 
+	{
 		#print "Graph ID: " . $_->{graphid} . " | Name: " . $_->{name} . "\n" for @{$graphs->{graphs}};
-		foreach my $graph(@{$graphs->{graphs}}) {
+		foreach my $graph(@{$graphs->{graphs}}) 
+		{
 			$graph_id = $graph->{graphid}; 
 			&write_log_to_file("\t| $i) Graph ID: $graph->{graphid} | Graph name: $graph->{name}");
 			&get_items_from_graphs($graph->{graphid});
@@ -464,9 +474,10 @@ sub get_graphs {
 }
 
 ################################################################################
-#Получение Item которые используются в триггерах
+#Get item
 ################################################################################
-sub get_items_with_triggers {
+sub get_items_with_triggers 
+{
 
     my ($host_name) = @_;
 	my $i = 1;
@@ -493,10 +504,12 @@ sub get_items_with_triggers {
 
 	&write_log_to_file("API* Item with triggers for $host_name:");
 	
-	foreach my $items(@{$response->content->{result}}) {
+	foreach my $items(@{$response->content->{result}}) 
+	{
 		#$item_trigger = "\tTrigger ID: " . $_->{triggerid} for @{$item->{triggers}};
 		#print "Trigger ID: " . $_->{triggerid} . "\n" for @{$items->{triggers}};
-		foreach my $item(@{$items->{triggers}}) {
+		foreach my $item(@{$items->{triggers}}) 
+		{
 			&write_log_to_file("\t| $i) Trigger ID: $item->{triggerid} | Trigger name: $item->{description}");
 			$i++;
 		}
@@ -508,7 +521,8 @@ sub get_items_with_triggers {
 ################################################################################
 #Get items from graphs
 ################################################################################
-sub get_items_from_graphs {
+sub get_items_from_graphs 
+{
 
 	my ($graph_id) = @_;
 	my $i = 1;
@@ -532,8 +546,10 @@ sub get_items_from_graphs {
 
 	die "graph.get(selectItems) failed\n" unless $response->content->{result};
 
-	foreach my $items(@{$response->content->{result}}) {
-		foreach my $item(@{$items->{items}}) {
+	foreach my $items(@{$response->content->{result}}) 
+	{
+		foreach my $item(@{$items->{items}}) 
+		{
 			&write_log_to_file("\t\t|| $i) Item ID: $item->{itemid} | Item name: $item->{name}");
 			&get_items_from_graphs_with_triggers($item->{itemid});
 			$i++;
@@ -543,7 +559,7 @@ sub get_items_from_graphs {
 }
 
 ################################################################################
-#Получение Item с графика с триггером
+#Get item from graph and with trigger
 ################################################################################
 sub get_items_from_graphs_with_triggers {
 
@@ -572,15 +588,19 @@ sub get_items_from_graphs_with_triggers {
 	
 	#$graph_rnd = &get_random_prefix();
 
-	foreach my $triggers(@{$response->content->{result}}) {
-		foreach my $trigger(@{$triggers->{triggers}}) {
+	foreach my $triggers(@{$response->content->{result}}) 
+	{
+		foreach my $trigger(@{$triggers->{triggers}}) 
+		{
 			$triggerid = $trigger->{triggerid};	
 			&write_log_to_file("\t\t\t||| $i) Trigger ID: $trigger->{triggerid} | Trigger name: $trigger->{description}");
-			if ($trigger_id == $triggerid) {
+			if ($trigger_id == $triggerid) 
+			{
 				&write_log_to_file("\t\t\t\t|||| This Trigger, Graph ID: $graph_id");
 				&download_graph($graph_rnd, $graph_id);
 			}
-			else {
+			else 
+			{
 				&write_log_to_file("\t\t\t\t|||| НЕ ЭТОТ ТРИГГЕР");
 			}
 			$i++;
@@ -590,23 +610,10 @@ sub get_items_from_graphs_with_triggers {
 }
 
 ################################################################################
-#
-################################################################################
-sub write_log_to_console {
-
-    my ($message, $color) = @_;
-
-    my $date_time = localtime();
-
-    print color($color);
-    print "$date_time => $message\n";
-    print color('reset');
-}
-
-################################################################################
 #Write to log file
 ################################################################################
-sub write_log_to_file {
+sub write_log_to_file 
+{
 
 	if ($logging eq "yes") {
 		
@@ -615,7 +622,10 @@ sub write_log_to_file {
 		my $size = &convert_to_mb(&get_size($path_log));
 		
 		#if ($size > $max_size_log) { &delete_file($path_log) }
-		if ($size > MAX_LOG_SIZE) { &delete_file($path_log) }
+		if ($size > MAX_LOG_SIZE) 
+		{ 
+			&delete_file($path_log) 
+		}
 
 		open(my $fh, '>>', $path_log);
 
@@ -630,7 +640,8 @@ sub write_log_to_file {
 ################################################################################
 #Get size of log file
 ################################################################################
-sub get_size {
+sub get_size 
+{
 
 	my ($file) = @_;
 	
@@ -643,7 +654,8 @@ sub get_size {
 ################################################################################
 #Convert to MB
 ################################################################################
-sub convert_to_mb {
+sub convert_to_mb 
+{
 
 	my ($size) = @_;
 	
@@ -653,7 +665,8 @@ sub convert_to_mb {
 ################################################################################
 #
 ################################################################################
-sub trim { 
+sub trim 
+{ 
 	my $s = shift; 
 	$s =~ s/^\s+|\s+$//g; 
 	return $s; 
@@ -662,46 +675,52 @@ sub trim {
 ################################################################################
 #
 ################################################################################
-sub parse_argv {
+sub parse_argv 
+{
 
-	foreach my $parameter(@ARGV) {
+	foreach my $parameter(@ARGV) 
+	{
 		#
 		#Script parameters
-		#
-		#switch ($parameter) {
-			#case m/(?<=recipient:)\s*([a-z0-9.-]+\@[a-z0-9.-]+)/sm { $recipient = &trim($1); &write_log_to_file("Parameter* recipient => $recipient"); }
-		#}
+		#	
 		
-		
-		if ($parameter =~ m/(?<=recipient:)\s*([a-z0-9.-]+\@[a-z0-9.-]+)/sm) {
+		if ($parameter =~ m/(?<=recipient:)\s*([a-z0-9.-]+\@[a-z0-9.-]+)/sm) 
+		{
 			$recipient = &trim($1);
 			&write_log_to_file("Parameter* recipient => $recipient");
 		}
-		if ($parameter =~ m/(?<=subject:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=subject:)\s*(.*?)$/sm) 
+		{
 			$subject = &trim($1);
 			&write_log_to_file("Parameter* subject => $subject");
 		}
-		if ($parameter =~ m/(?<=from:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=from:)\s*(.*?)$/sm) 
+		{
 			$from = &trim($1);
 			&write_log_to_file("Parameter* from => $from");
 		}
-		if ($parameter =~ m/(?<=mail-server:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=mail-server:)\s*(.*?)$/sm) 
+		{
 			$mail_server = &trim($1);
 			&write_log_to_file("Parameter* mail-server => $mail_server");
 		}
-		if ($parameter =~ m/(?<=zabbix-server:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=zabbix-server:)\s*(.*?)$/sm) 
+		{
 			$zabbix_server = &trim($1);
 			&write_log_to_file("Parameter* zabbix-server => $zabbix_server");
 		}
-		if ($parameter =~ m/(?<=zabbix-user:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=zabbix-user:)\s*(.*?)$/sm) 
+		{
 			$zabbix_user = &trim($1);
 			&write_log_to_file("Parameter* zabbix-user => $zabbix_user");
 		}
-		if ($parameter =~ m/(?<=zabbix-password:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=zabbix-password:)\s*(.*?)$/sm) 
+		{
 			$zabbix_password = &trim($1);
 			&write_log_to_file("Parameter* zabbix-password => $zabbix_password");
 		}
-		if ($parameter =~ m/(?<=language:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=language:)\s*(.*?)$/sm) 
+		{
 			$language = &trim($1);
 			&write_log_to_file("Parameter* language => $1");
 		}
@@ -711,63 +730,77 @@ sub parse_argv {
 		#
 		
 		#Host
-		if ($parameter =~ m/(?<=Host[\s*]name:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=Host[\s*]name:)\s*(.*?)$/sm)
+		{
 			$host_name = &trim($1);
 			&write_log_to_file("Parameter* host name => $host_name");
 		}
-		if ($parameter =~ m/(?<=Host[\s*]alias:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=Host[\s*]alias:)\s*(.*?)$/sm) 
+		{
 			$host_alias = &trim($1);
 			&write_log_to_file("Parameter* host alias => $host_alias");
 		}
-		if ($parameter =~ m/(?<=Host[\s*]IP:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=Host[\s*]IP:)\s*(.*?)$/sm)
+		{
 			$host_ip = &trim($1);
 			&write_log_to_file("Parameter* host ip => $host_ip");
 		}	
-		if ($parameter =~ m/(?<=Host[\s*]description:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=Host[\s*]description:)\s*(.*?)$/sm)
+		{
 			$host_description = &trim($1);
 			&write_log_to_file("Parameter* host description => $host_description");
 		}
 		
 		#Trigger
-		if ($parameter =~ m/(?<=Trigger[\s*]name:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=Trigger[\s*]name:)\s*(.*?)$/sm)
+		{
 			$trigger_name = &trim($1);
 			&write_log_to_file("Parameter* trigger name => $trigger_name");
 		}
-		if ($parameter =~ m/(?<=Trigger[\s*]status:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=Trigger[\s*]status:)\s*(.*?)$/sm) 
+		{
 			$trigger_status = &trim($1);
 			&write_log_to_file("Parameter* trigger status => $trigger_status");
 		}
-		if ($parameter =~ m/(?<=Trigger[\s*]value:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=Trigger[\s*]value:)\s*(.*?)$/sm)
+		{
 			$trigger_value = &trim($1);
 			&write_log_to_file("Parameter* trigger value => $trigger_value");
 		}
-		if ($parameter =~ m/(?<=Trigger[\s*]severity:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=Trigger[\s*]severity:)\s*(.*?)$/sm)
+		{
 			$trigger_severity = &trim($1);
 			&write_log_to_file("Parameter* trigger severity => $trigger_severity");
 		}
-		if ($parameter =~ m/(?<=Trigger[\s*]nseverity:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=Trigger[\s*]nseverity:)\s*(.*?)$/sm)
+		{
 			$trigger_nseverity = &trim($1);
 			&write_log_to_file("Parameter* trigger nseverity => $trigger_nseverity");
 		}
-		if ($parameter =~ m/(?<=Trigger[\s*]expression:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=Trigger[\s*]expression:)\s*(.*?)$/sm)
+		{
 			$trigger_expression = &trim($1);
 			&write_log_to_file("Parameter* trigger expression => $trigger_expression");
 		}
-		if ($parameter =~ m/(?<=Trigger[\s*]description:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=Trigger[\s*]description:)\s*(.*?)$/sm)
+		{
 			$trigger_description = &trim($1);
 			&write_log_to_file("Parameter* trigger description => $trigger_description");
 		}
-		if ($parameter =~ m/(?<=Trigger[\s*]template:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=Trigger[\s*]template:)\s*(.*?)$/sm)
+		{
 			$trigger_template = &trim($1);
 			&write_log_to_file("Parameter* trigger template => $trigger_template");
 		}
-		if ($parameter =~ m/(?<=Trigger[\s*]ID:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=Trigger[\s*]ID:)\s*(.*?)$/sm)
+		{
 			$trigger_id = &trim($1);
 			&write_log_to_file("Parameter* trigger ID => $trigger_id");
 		}
 		
 		#Item
-		if ($parameter =~ m/(?<=Last[\s*]value:)\s*(.*?)$/sm) {
+		if ($parameter =~ m/(?<=Last[\s*]value:)\s*(.*?)$/sm)
+		{
 			$item_last = &trim($1);
 			&write_log_to_file("Parameter* last value => $item_last");
 		}
@@ -775,30 +808,31 @@ sub parse_argv {
 }
 
 ################################################################################
-#
+#Main procedure
 ################################################################################
-sub main {
+sub main 
+{
 
-&write_log_to_file("============= START =============");
+	&write_log_to_file("============= START =============");
 
-&parse_argv();
+	&parse_argv();
 
-$url = "http://$zabbix_server/api_jsonrpc.php";
+	$url = "http://$zabbix_server/api_jsonrpc.php";
 
-$graph_rnd = &get_random_prefix();
+	$graph_rnd = &get_random_prefix();
 
-#Auth
-&zabbix_auth();
+	#Auth
+	&zabbix_auth();
 
-$host_id = &zabbix_get_hostid($host_name);
-&get_graphs_count($host_id);
-&get_graphs($host_name);
-&get_items_with_triggers($host_name);
+	$host_id = &zabbix_get_hostid($host_name);
+	&get_graphs_count($host_id);
+	&get_graphs($host_name);
+	&get_items_with_triggers($host_name);
 
-#Logout
-&zabbix_logout;
+	#Logout
+	&zabbix_logout;
 
-&send_message($recipient, $from, $subject, $message, $graph_rnd);
+	&send_message($recipient, $from, $subject, $message, $graph_rnd);
 
-&write_log_to_file("============== END ==============");
+	&write_log_to_file("============== END ==============");
 }
