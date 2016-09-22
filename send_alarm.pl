@@ -7,82 +7,92 @@ use LWP::Simple;
 use File::Basename;
 use POSIX;
 use Switch;
+use Cwd;
 
 use JSON::RPC::Client;
 use Data::Dumper;
 
+my $file_logo = "logo.png";
+my $path_logo = "/usr/lib/zabbix/alertscripts/";
+my $path_log = "/var/log/zabbix/send_alarm.log";
+
 my %color_trigger_value = (
-			    0 => "00CC00",  #OK
+			    0 => "00CC00",	#OK
 			    1 => "CC0000"	#PROBLEM
-); 
+);
 
 my %color_trigger_severity = (
-			    0 => "97AAB3",  #Not classified
-			    1 => "7499FF",  #Information
-			    2 => "FFC859",  #Warning
-			    3 => "FFA059",  #Average
-			    4 => "E97659",  #High
+			    0 => "97AAB3",	#Not classified
+			    1 => "7499FF",	#Information
+			    2 => "FFC859",	#Warning
+			    3 => "FFA059",	#Average
+			    4 => "E97659",	#High
 			    5 => "E45959"	#Disaster
 );
 
 my %field_description = (
 			    ru =>	{
-					host_name 			=> "Имя узла сети:",
-					host_alias 			=> "Видимое имя узла:",
-					host_ip 			=> "IP адрес:",
+					host_name 		=> "Имя узла сети:",
+					host_alias 		=> "Видимое имя узла:",
+					host_ip 		=> "IP адрес:",
 					host_description 	=> "Описание узла:",
 					trigger_name 		=> "Триггер:",
 					trigger_status 		=> "Статус триггера:",
 					trigger_severity 	=> "Важность триггера:",
 					trigger_expression 	=> "Выражение триггера:",
-					trigger_description => "Описание триггера:",
+					trigger_description	=> "Описание триггера:",
 					trigger_template 	=> "Шаблон:",
-					item_last 			=> "Последнее полученное значение:",
+					item_last 		=> "Последнее полученное значение:",
 				},
-				en =>	{
-					host_name 			=> "Host name:",
-					host_alias 			=> "Host alias:",
-					host_ip 			=> "IP address:",
+			    en =>	{
+					host_name 		=> "Host name:",
+					host_alias 		=> "Host alias:",
+					host_ip 		=> "IP address:",
 					host_description 	=> "Host description:",
 					trigger_name 		=> "Trigger:",
 					trigger_status 		=> "Trigger status:",
 					trigger_severity 	=> "Trigger severity:",
 					trigger_expression 	=> "Trigger expression:",
-					trigger_description => "Trigger description:",
+					trigger_description 	=> "Trigger description:",
 					trigger_template 	=> "Template:",
-					item_last 			=> "Last value:"
+					item_last 		=> "Last value:"
 				},
 );
 
 my %rx = (
 	'recipient' 			=> '(?<=recipient:)\s*([a-z0-9.-]+\@[a-z0-9.-]+)',
-	'subject' 				=> '(?<=subject:)\s*(.*?)$',
-	'from' 					=> '(?<=from:)\s*(.*?)$',
+	'subject' 			=> '(?<=subject:)\s*(.*?)$',
+	'from' 				=> '(?<=from:)\s*(.*?)$',
 	'mail-server' 			=> '(?<=mail-server:)\s*(.*?)$',
 	'zabbix-server' 		=> '(?<=zabbix-server:)\s*(.*?)$',
 	'zabbix-user' 			=> '(?<=zabbix-user:)\s*(.*?)$',
 	'zabbix-password' 		=> '(?<=zabbix-password:)\s*(.*?)$',
-	'language' 				=> '(?<=language:)\s*(.*?)$',
+	'language' 			=> '(?<=language:)\s*(.*?)$',
 	'host-name' 			=> '(?<=Host[\s*]name:)\s*(.*?)$',
 	'host-alias' 			=> '(?<=Host[\s*]alias:)\s*(.*?)$',
-	'host-ip' 				=> '(?<=Host[\s*]IP:)\s*(.*?)$',
+	'host-ip' 			=> '(?<=Host[\s*]IP:)\s*(.*?)$',
 	'host-description' 		=> '(?<=Host[\s*]description:)\s*(.*?)$',
 	'trigger-name' 			=> '(?<=Trigger[\s*]name:)\s*(.*?)$',
 	'trigger-status' 		=> '(?<=Trigger[\s*]status:)\s*(.*?)$',
 	'trigger-value' 		=> '(?<=Trigger[\s*]value:)\s*(.*?)$',
 	'trigger-severity' 		=> '(?<=Trigger[\s*]severity:)\s*(.*?)$',
-	'trigger-nseverity' 	=> '(?<=Trigger[\s*]nseverity:)\s*(.*?)$',
-	'trigger-expression' 	=> '(?<=Trigger[\s*]expression:)\s*(.*?)$',
-	'trigger-description' 	=> '(?<=Trigger[\s*]description:)\s*(.*?)$',
+	'trigger-nseverity'		=> '(?<=Trigger[\s*]nseverity:)\s*(.*?)$',
+	'trigger-expression'		=> '(?<=Trigger[\s*]expression:)\s*(.*?)$',
+	'trigger-description'		=> '(?<=Trigger[\s*]description:)\s*(.*?)$',
 	'trigger-template' 		=> '(?<=Trigger[\s*]template:)\s*(.*?)$',
 	'trigger-id' 			=> '(?<=Trigger[\s*]ID:)\s*(.*?)$',
 	'last_value' 			=> '(?<=Last[\s*]value:)\s*(.*?)$'
 );
 
-use constant 
+use constant
 {
-        MAX_LOG_SIZE => 10 #MB
-		#PERIOD => scalar 3600 #3600 sec is 1 hour, 7200 is 2 hour
+	MAX_LOG_SIZE 	=> 10,		#MB
+	PERIOD 		=> 3600,	#3600 sec is 1 hour, 7200 is 2 hour
+	WIDTH_GRAPH 	=> 800,
+	HEIGHT_GRAPH 	=> 500,
+	WIDTH_LOGO 	=> 100,
+	HEIGHT_LOGO 	=> 100,
+	LOGGING 	=> "yes"
 };
 
 my $recipient;
@@ -94,17 +104,9 @@ my $zabbix_server;
 my $zabbix_user;
 my $zabbix_password;
 my $language;
-my $logging = "yes";
 
 my $authID;
 my $url;
-my $file_logo = "logo.png";
-my $path_logo = "/usr/lib/zabbix/alertscripts/";
-my $path_log = "/var/log/zabbix/send_alarm.log";
-my $period = 7200; #3600 sec is 1 hour, 7200 is 2 hour
-my $width_graph = 1000;
-my $height_graph = 500;
-#my $max_size_log = 10;
 
 my $host_id;
 my $host_name;
@@ -134,56 +136,63 @@ my $client = new JSON::RPC::Client;
 ################################################################################
 #Send message
 ################################################################################
-sub send_message 
+sub send_message
 {
 
     my ($recipient, $from, $subject, $message, $file) = @_;
-	my $body = &create_html($file);
-	
-	&write_log_to_file("Body:");
-	&write_log_to_file($body);
-	
+
+    my $body = &create_html($file);
+
+    &write_log_to_file("Body:");
+    &write_log_to_file($body);
+
     my $msg = MIME::Lite->new(
-		From     => $from,
-		To       => $recipient,
-		Subject  => $subject,
-		Type     => "multipart/related"
+	From     => $from,
+	To       => $recipient,
+	Subject  => $subject,
+	Type     => "multipart/related"
     );
 
     $msg->attach(
-		Type => "text/html",
-		Data => $body 
-	);
-
-    $msg->attach(
-		Type => "image/gif",
-		Id   => $file_logo,
-		Path => $path_logo . $file_logo,
-	);
-		
-	$msg->attach(
-		Type => "image/gif",
-		Id   => $file,
-		Path => $path_logo . $file,
+	Type => "text/html",
+	Data => $body 
     );
 
-    $msg->send("smtp", $mail_server, logging => $logging);
-	
-	&delete_file($path_logo.$file);
-	
-	&write_log_to_file("Email Sent: $recipient Successfully");
-	
-	#($msg, $body) = ();
+    $msg->attach(
+	Type => "image/jpeg",
+	Id   => $file,
+	Path => $path_logo . $file,
+    );
+
+    $msg->attach(
+	Type => "image/gif",
+	Id   => $file_logo,
+	Path => $path_logo . $file_logo,
+    );
+
+    #$msg->send("smtp", $mail_server, logging => $logging);
+    $msg->send("smtp", $mail_server);
+
+    &delete_file($path_logo.$file);
+
+    &write_log_to_file("Email Sent: $recipient Successfully");
+
+    #($msg, $body) = ();
 }
 
 ################################################################################
 #Create HTML
 ################################################################################
-sub create_html 
+sub create_html
 {
 
-	my ($file)					= @_;
-	
+    my ($file)		= @_;
+
+    my $width_graph	= WIDTH_GRAPH;
+    my $height_graph	= HEIGHT_GRAPH;
+    my $width_logo	= WIDTH_LOGO;
+    my $height_logo	= HEIGHT_LOGO;
+
     my $color_trigger_severity 	= $color_trigger_severity{$trigger_nseverity};
     my $color_trigger_value 	= %color_trigger_value{$trigger_value};
 
@@ -244,48 +253,62 @@ sub create_html
 							<td>$item_last</td>
 						</tr>
 					</table>
-					<br/><img src="cid:$file" width="$width_graph" height="$height_graph" align="left" alt="zabbix_graph"/>
+					<br/><img src="cid:$file" width="$width_graph" height="$height_graph" alt="zabbix_graph"/>
 					<br/><br/><p><b>Zabbix server</b></p>
-					<img src="cid:$file_logo" width="100" height="100" align="left" alt="logo"/>
+					<img src="cid:$file_logo" width="$width_logo" height="$height_logo" alt="logo"/>
 					</body>
 					</html>
 				};
-				
-	&write_log_to_file("Create HTML successfully");
-	
-	return $html;
+
+    &write_log_to_file("Create HTML successfully");
+
+    return $html;
+}
+
+################################################################################
+#Get current path
+################################################################################
+sub get_current_path
+{
+#my $path = $ENV{PWD};
+my $path = cwd();
+ return $path;
 }
 
 ################################################################################
 #Download graph
 ################################################################################
-sub download_graph 
+sub download_graph
 {
 
-	my ($file, $graphid) = @_;
-	
-	getstore("http://$zabbix_server/chart2.php?graphid=$graphid&period=$period&width=800", "/usr/lib/zabbix/alertscripts/$file");
-	
-	&write_log_to_file("Download file: $file successfuly");
+    my ($file, $graphid) = @_;
+    #my $current_path = &get_current_path();
+    my $period = PERIOD;
+    my $width_graph = WIDTH_GRAPH;
+
+    getstore("http://$zabbix_server/chart2.php?graphid=$graphid&period=$period&width=$width_graph", "/usr/lib/zabbix/alertscripts/$file");
+
+    #&write_log_to_file("Path for download: $current_path");
+    #&write_log_to_file("Download file: $current_path/$file successfuly");
 }
 
 ################################################################################
 #Delete graph
 ################################################################################
-sub delete_file 
+sub delete_file
 {
 
     my ($file) = @_;
 
     unlink $file;
-	
+
     &write_log_to_file("Delete file: $file successfuly");
 }
 
 ################################################################################
 #Generation name of graph
 ################################################################################
-sub get_random_prefix 
+sub get_random_prefix
 {
 
     my $rnd;
@@ -298,7 +321,7 @@ sub get_random_prefix
 ################################################################################
 #Login
 ################################################################################
-sub zabbix_auth 
+sub zabbix_auth
 {
 
     my $response;
@@ -313,28 +336,28 @@ sub zabbix_auth
 		id => 1
 	    };
 
-	$response = $client->call($url, $json);
+    $response = $client->call($url, $json);
 
-	if (!defined($response))
-	{
-		&write_log_to_file("START = zabbix_auth = Authentication failed");
-	}
-	
-	die "Authentication failed\n" unless $response->content->{result};
+    if (!defined($response))
+    {
+	&write_log_to_file("START = zabbix_auth = Authentication failed");
+    }
 
-	$authID = $response->content->{result};
+    die "Authentication failed\n" unless $response->content->{result};
 
-	&write_log_to_file("API* Authentication successful.Auth ID: $authID");
-	
-	undef $response;
-	
-	return $authID;
+    $authID = $response->content->{result};
+
+    &write_log_to_file("API* Authentication successful.Auth ID: $authID");
+
+    #undef $response;
+
+    return $authID;
 }
 
 ################################################################################
 #Logout
 ################################################################################
-sub zabbix_logout 
+sub zabbix_logout
 {
 
     my $response;
@@ -347,24 +370,23 @@ sub zabbix_logout
 		auth => $authID,
 		};
 		
-	$response = $client->call($url, $json);
+    $response = $client->call($url, $json);
 
-	die "Logout failed\n" unless $response->content->{result};
+    die "Logout failed\n" unless $response->content->{result};
 
-	#&write_log_to_console("Logout successful. Auth ID: $authID", "green");
-	#undef $response;
+    #undef $response;
 
-	&write_log_to_file("API* Logout successful.Auth ID: $authID");
+    &write_log_to_file("API* Logout successful. Auth ID: $authID");
 }
 
 ################################################################################
 #Get host id by name
 ################################################################################
-sub zabbix_get_hostid 
+sub zabbix_get_hostid
 {
 
     my ($host_name) = @_;
-	my $response;
+    my $response;
 
     my $json = {
                 jsonrpc => "2.0",
@@ -378,32 +400,32 @@ sub zabbix_get_hostid
                 id => 1,
                 auth => "$authID",
                 };
-				
-	$response = $client->call($url, $json);
 
-	die "host.get(hostid) failed\n" unless $response->content->{result};
+    $response = $client->call($url, $json);
 
-	foreach my $host(@{$response->content->{result}}) 
-	{
-		$host_id = $host->{hostid};
-	}
+    die "host.get(hostid) failed\n" unless $response->content->{result};
 
-	&write_log_to_file("API* Host ID: $host_id");
-	
-	undef $response;
-	
-	return $host_id;
+    foreach my $host(@{$response->content->{result}}) 
+    {
+	$host_id = $host->{hostid};
+    }
+
+    &write_log_to_file("API* Host ID: $host_id");
+
+    #undef $response;
+
+    return $host_id;
 }
 
 ################################################################################
 #Get count graphs
 ################################################################################
-sub get_graphs_count 
+sub get_graphs_count
 {
 
     my ($host_id) = @_;
-	my $graphs_count;
-	my $response;
+    my $graphs_count;
+    my $response;
 
     my $json = {
                 jsonrpc => "2.0",
@@ -415,29 +437,30 @@ sub get_graphs_count
                 id => 1,
                 auth => "$authID",
                 };
-				
-	$response = $client->call($url, $json);
 
-	die "graph.get.get(countOutput) failed\n" unless $response->content->{result};
+    $response = $client->call($url, $json);
 
-	$graphs_count = $response->content->{result};
+    die "graph.get.get(countOutput) failed\n" unless $response->content->{result};
 
-	&write_log_to_file("API* Graphs count: $graphs_count");
-	
-	undef $response;
+    $graphs_count = $response->content->{result};
+
+    &write_log_to_file("API* Graphs count: $graphs_count");
+
+    #undef $response;
 
 }
 
 ################################################################################
 #Get graphs
 ################################################################################
-sub get_graphs {
+sub get_graphs
+{
 
     my ($host_name) = @_;
-	my $graph_name;
-	my $response;
-	my $i = 1;
-	
+    my $graph_name;
+    my $response;
+    my $i = 1;
+
     my $json = {
                 jsonrpc => "2.0",
                 method => "host.get",
@@ -451,39 +474,38 @@ sub get_graphs {
                 id => 1,
                 auth => "$authID",
                 };
-				
-	$response = $client->call($url, $json);
 
-	die "host.get(selectGraphs) failed\n" unless $response->content->{result};
+    $response = $client->call($url, $json);
 
-	&write_log_to_file("API* Graphs for $host_name:");
+    die "host.get(selectGraphs) failed\n" unless $response->content->{result};
 
-	foreach my $graphs(@{$response->content->{result}}) 
+    &write_log_to_file("API* Graphs for $host_name:");
+
+    foreach my $graphs(@{$response->content->{result}}) 
+    {
+	foreach my $graph(@{$graphs->{graphs}}) 
 	{
-		#print "Graph ID: " . $_->{graphid} . " | Name: " . $_->{name} . "\n" for @{$graphs->{graphs}};
-		foreach my $graph(@{$graphs->{graphs}}) 
-		{
-			$graph_id = $graph->{graphid}; 
-			&write_log_to_file("\t| $i) Graph ID: $graph->{graphid} | Graph name: $graph->{name}");
-			&get_items_from_graphs($graph->{graphid});
-			$i++;
-		}
+	    $graph_id = $graph->{graphid}; 
+	    &write_log_to_file("\t| $i) Graph ID: $graph->{graphid} | Graph name: $graph->{name}");
+	    &get_items_from_graphs($graph->{graphid});
+	    $i++;
 	}
-	#undef $response;
-	#undef $graph_name;
+    }
+
+    #($response, $graph_name) = ();
 }
 
 ################################################################################
 #Get item
 ################################################################################
-sub get_items_with_triggers 
+sub get_items_with_triggers
 {
 
     my ($host_name) = @_;
-	my $i = 1;
-	my $item_trigger;
-	my $response;
-	
+    my $i = 1;
+    my $item_trigger;
+    my $response;
+
     my $json = {
                 jsonrpc => "2.0",
                 method => "item.get",
@@ -497,37 +519,37 @@ sub get_items_with_triggers
                 id => 1,
                 auth => "$authID",
                 };
-				
-	$response = $client->call($url, $json);
 
-	die "host.get(selectTriggers) failed\n" unless $response->content->{result};
+    $response = $client->call($url, $json);
 
-	&write_log_to_file("API* Item with triggers for $host_name:");
-	
-	foreach my $items(@{$response->content->{result}}) 
+    die "host.get(selectTriggers) failed\n" unless $response->content->{result};
+
+    &write_log_to_file("API* Item with triggers for $host_name:");
+
+    foreach my $items(@{$response->content->{result}}) 
+    {
+	#$item_trigger = "\tTrigger ID: " . $_->{triggerid} for @{$item->{triggers}};
+	#print "Trigger ID: " . $_->{triggerid} . "\n" for @{$items->{triggers}};
+	foreach my $item(@{$items->{triggers}}) 
 	{
-		#$item_trigger = "\tTrigger ID: " . $_->{triggerid} for @{$item->{triggers}};
-		#print "Trigger ID: " . $_->{triggerid} . "\n" for @{$items->{triggers}};
-		foreach my $item(@{$items->{triggers}}) 
-		{
-			&write_log_to_file("\t| $i) Trigger ID: $item->{triggerid} | Trigger name: $item->{description}");
-			$i++;
-		}
+	    &write_log_to_file("\t| $i) Trigger ID: $item->{triggerid} | Trigger name: $item->{description}");
+	    $i++;
 	}
-	
-	undef $response;
+    }
+
+    #undef $response;
 }
 
 ################################################################################
 #Get items from graphs
 ################################################################################
-sub get_items_from_graphs 
+sub get_items_from_graphs
 {
 
-	my ($graph_id) = @_;
-	my $i = 1;
-	my $response;
-	
+    my ($graph_id) = @_;
+    my $i = 1;
+    my $response;
+
     my $json = {
                 jsonrpc => "2.0",
                 method => "graph.get",
@@ -541,33 +563,35 @@ sub get_items_from_graphs
                 id => 1,
                 auth => "$authID",
                 };
-				
-	$response = $client->call($url, $json);
 
-	die "graph.get(selectItems) failed\n" unless $response->content->{result};
+    $response = $client->call($url, $json);
 
-	foreach my $items(@{$response->content->{result}}) 
+    die "graph.get(selectItems) failed\n" unless $response->content->{result};
+
+    foreach my $items(@{$response->content->{result}}) 
+    {
+	foreach my $item(@{$items->{items}}) 
 	{
-		foreach my $item(@{$items->{items}}) 
-		{
-			&write_log_to_file("\t\t|| $i) Item ID: $item->{itemid} | Item name: $item->{name}");
-			&get_items_from_graphs_with_triggers($item->{itemid});
-			$i++;
-		}
+	    &write_log_to_file("\t\t|| $i) Item ID: $item->{itemid} | Item name: $item->{name}");
+	    &get_items_from_graphs_with_triggers($item->{itemid});
+	    $i++;
 	}
-	#undef $response;
+    }
+
+    #undef $response;
 }
 
 ################################################################################
 #Get item from graph and with trigger
 ################################################################################
-sub get_items_from_graphs_with_triggers {
+sub get_items_from_graphs_with_triggers
+{
 
-	my ($item_id) = @_;
-	my $i = 1;
-	my $triggerid;
-	my $response;
-	
+    my ($item_id) = @_;
+    my $i = 1;
+    my $triggerid;
+    my $response;
+
     my $json = {
                 jsonrpc => "2.0",
                 method => "item.get",
@@ -581,145 +605,153 @@ sub get_items_from_graphs_with_triggers {
                 id => 1,
                 auth => "$authID",
                 };
-				
-	$response = $client->call($url, $json);
 
-	die "item.get(selectTriggers) failed\n" unless $response->content->{result};
-	
-	#$graph_rnd = &get_random_prefix();
+    $response = $client->call($url, $json);
 
-	foreach my $triggers(@{$response->content->{result}}) 
+    die "item.get(selectTriggers) failed\n" unless $response->content->{result};
+
+    #$graph_rnd = &get_random_prefix();
+
+    foreach my $triggers(@{$response->content->{result}}) 
+    {
+	foreach my $trigger(@{$triggers->{triggers}}) 
 	{
-		foreach my $trigger(@{$triggers->{triggers}}) 
-		{
-			$triggerid = $trigger->{triggerid};	
-			&write_log_to_file("\t\t\t||| $i) Trigger ID: $trigger->{triggerid} | Trigger name: $trigger->{description}");
-			if ($trigger_id == $triggerid) 
-			{
-				&write_log_to_file("\t\t\t\t|||| This Trigger, Graph ID: $graph_id");
-				&download_graph($graph_rnd, $graph_id);
-			}
-			else 
-			{
-				&write_log_to_file("\t\t\t\t|||| НЕ ЭТОТ ТРИГГЕР");
-			}
-			$i++;
-		}
+	    $triggerid = $trigger->{triggerid};	
+	    &write_log_to_file("\t\t\t||| $i) Trigger ID: $trigger->{triggerid} | Trigger name: $trigger->{description}");
+
+	    if ($trigger_id == $triggerid) 
+	    {
+		#&write_log_to_file("\t\t\t\t|||| This Trigger, Graph ID: $graph_id");
+		&download_graph($graph_rnd, $graph_id);
+	    }
+	    #else
+	    #{
+		#&write_log_to_file("\t\t\t\t|||| НЕ ЭТОТ ТРИГГЕР");
+	    #}
+	    $i++;
 	}
-	#($json, $response) = ();
+    }
+
+    #($json, $response) = ();
 }
 
 ################################################################################
 #Write to log file
 ################################################################################
-sub write_log_to_file 
+sub write_log_to_file
 {
 
-	if ($logging eq "yes") {
-		
-		my ($log) = @_;
-		
-		my $size = &convert_to_mb(&get_size($path_log));
-		
-		#if ($size > $max_size_log) { &delete_file($path_log) }
-		if ($size > MAX_LOG_SIZE) 
-		{ 
-			&delete_file($path_log) 
-		}
+    my $logging = LOGGING;
 
-		open(my $fh, '>>', $path_log);
+    if ($logging eq "yes")
+    {
+	my ($log) = @_;
 
-		my $date_time = localtime();
+	my $size = &convert_to_mb(&get_size($path_log));
 
-		print $fh "$date_time - $log\n" if defined $log;
-
-		close $fh;
+	#if ($size > $max_size_log) { &delete_file($path_log) }
+	if ($size > MAX_LOG_SIZE)
+	{
+	    &delete_file($path_log);
 	}
+
+	#open(my $fh, '>>', $path_log) or die "Can't open file $path_log";
+
+	#my $date_time = localtime();
+
+	#print $fh "$date_time - $log\n" if defined $log;
+
+	#close $fh;
+    }
 }
 
 ################################################################################
 #Get size of log file
 ################################################################################
-sub get_size 
+sub get_size
 {
 
-	my ($file) = @_;
-	
-	my $size = -s $file;
-	
-	return $size;
-	
+    my ($file) = @_;
+
+    my $size = -s $file;
+
+    return $size;
+
 }
 
 ################################################################################
 #Convert to MB
 ################################################################################
-sub convert_to_mb 
+sub convert_to_mb
 {
 
-	my ($size) = @_;
-	
-	return ceil( ($size / (1024 * 1024)) );
+    my ($size) = @_;
+
+    return ceil( ($size / (1024 * 1024)) );
 }
 
 ################################################################################
 #
 ################################################################################
-sub trim 
-{ 
-	my $s = shift; 
-	$s =~ s/^\s+|\s+$//g; 
-	return $s; 
+sub trim
+{
+
+    my $s = shift;
+
+    $s =~ s/^\s+|\s+$//g;
+
+    return $s;
+
 }
 
 ################################################################################
 #
 ################################################################################
-sub parse_argv 
+sub parse_argv
 {
 
-	foreach my $parameter(@ARGV) 
+	foreach my $parameter(@ARGV)
 	{
 		#
 		#Script parameters
-		#	
+		#
 		
-		if ($parameter =~ m/(?<=recipient:)\s*([a-z0-9.-]+\@[a-z0-9.-]+)/sm) 
+		if ($parameter =~ m/(?<=recipient:)\s*([a-z0-9.-]+\@[a-z0-9.-]+)/sm)
 		{
 			$recipient = &trim($1);
 			&write_log_to_file("Parameter* recipient => $recipient");
 		}
-		if ($parameter =~ m/(?<=subject:)\s*(.*?)$/sm) 
+		if ($parameter =~ m/(?<=subject:)\s*(.*?)$/sm)
 		{
 			$subject = &trim($1);
 			&write_log_to_file("Parameter* subject => $subject");
 		}
-		if ($parameter =~ m/(?<=from:)\s*(.*?)$/sm) 
+		if ($parameter =~ m/(?<=from:)\s*(.*?)$/sm)
 		{
 			$from = &trim($1);
 			&write_log_to_file("Parameter* from => $from");
 		}
-		if ($parameter =~ m/(?<=mail-server:)\s*(.*?)$/sm) 
+		if ($parameter =~ m/(?<=mail-server:)\s*(.*?)$/sm)
 		{
 			$mail_server = &trim($1);
 			&write_log_to_file("Parameter* mail-server => $mail_server");
 		}
-		if ($parameter =~ m/(?<=zabbix-server:)\s*(.*?)$/sm) 
+		if ($parameter =~ m/(?<=zabbix-server:)\s*(.*?)$/sm)
 		{
 			$zabbix_server = &trim($1);
 			&write_log_to_file("Parameter* zabbix-server => $zabbix_server");
 		}
-		if ($parameter =~ m/(?<=zabbix-user:)\s*(.*?)$/sm) 
+		if ($parameter =~ m/(?<=zabbix-user:)\s*(.*?)$/sm)
 		{
 			$zabbix_user = &trim($1);
 			&write_log_to_file("Parameter* zabbix-user => $zabbix_user");
 		}
-		if ($parameter =~ m/(?<=zabbix-password:)\s*(.*?)$/sm) 
+		if ($parameter =~ m/(?<=zabbix-password:)\s*(.*?)$/sm)
 		{
 			$zabbix_password = &trim($1);
 			&write_log_to_file("Parameter* zabbix-password => $zabbix_password");
 		}
-		if ($parameter =~ m/(?<=language:)\s*(.*?)$/sm) 
+		if ($parameter =~ m/(?<=language:)\s*(.*?)$/sm)
 		{
 			$language = &trim($1);
 			&write_log_to_file("Parameter* language => $1");
@@ -735,7 +767,7 @@ sub parse_argv
 			$host_name = &trim($1);
 			&write_log_to_file("Parameter* host name => $host_name");
 		}
-		if ($parameter =~ m/(?<=Host[\s*]alias:)\s*(.*?)$/sm) 
+		if ($parameter =~ m/(?<=Host[\s*]alias:)\s*(.*?)$/sm)
 		{
 			$host_alias = &trim($1);
 			&write_log_to_file("Parameter* host alias => $host_alias");
@@ -757,7 +789,7 @@ sub parse_argv
 			$trigger_name = &trim($1);
 			&write_log_to_file("Parameter* trigger name => $trigger_name");
 		}
-		if ($parameter =~ m/(?<=Trigger[\s*]status:)\s*(.*?)$/sm) 
+		if ($parameter =~ m/(?<=Trigger[\s*]status:)\s*(.*?)$/sm)
 		{
 			$trigger_status = &trim($1);
 			&write_log_to_file("Parameter* trigger status => $trigger_status");
@@ -810,29 +842,32 @@ sub parse_argv
 ################################################################################
 #Main procedure
 ################################################################################
-sub main 
+sub main
 {
+    my $current_path = &get_current_path();
 
-	&write_log_to_file("============= START =============");
+    print $current_path;
 
-	&parse_argv();
+    &write_log_to_file("============= START =============");
 
-	$url = "http://$zabbix_server/api_jsonrpc.php";
+    &parse_argv();
 
-	$graph_rnd = &get_random_prefix();
+    $url = "http://$zabbix_server/api_jsonrpc.php";
 
-	#Auth
-	&zabbix_auth();
+    $graph_rnd = &get_random_prefix();
 
-	$host_id = &zabbix_get_hostid($host_name);
-	&get_graphs_count($host_id);
-	&get_graphs($host_name);
-	&get_items_with_triggers($host_name);
+    #Auth
+    &zabbix_auth();
 
-	#Logout
-	&zabbix_logout;
+    $host_id = &zabbix_get_hostid($host_name);
+    &get_graphs_count($host_id);
+    &get_graphs($host_name);
+    &get_items_with_triggers($host_name);
 
-	&send_message($recipient, $from, $subject, $message, $graph_rnd);
+    #Logout
+    &zabbix_logout;
 
-	&write_log_to_file("============== END ==============");
+    &send_message($recipient, $from, $subject, $message, $graph_rnd);
+
+    &write_log_to_file("============== END ==============");
 }
