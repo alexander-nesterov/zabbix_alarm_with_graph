@@ -152,11 +152,14 @@ sub send_message
 	Data => $body
     );
 
-    $msg->attach(
-	Type => 'image/jpeg',
-	Id   => $file,
-	Path => $path_logo . $file,
-    );
+    if (defined $file)
+    {
+	$msg->attach(
+	    Type => 'image/jpeg',
+	    Id   => $file,
+	    Path => $path_logo . $file,
+	);
+    }
 
     $msg->attach(
 	Type => 'image/gif',
@@ -246,12 +249,21 @@ sub create_html
 							<td>$item_last</td>
 						</tr>
 					</table>
-					<br/><img src="cid:$file" width="$width_graph" height="$height_graph" alt="zabbix_graph"/>
-					<br/><br/><p><b>Zabbix server</b></p>
-					<img src="cid:$file_logo" width="$width_logo" height="$height_logo" alt="logo"/>
-					</body>
-					</html>
-				};
+					};
+					
+					if (defined $file)
+					{
+					    $html .= qq{
+						<br/><img src="cid:$file" width="$width_graph" height="$height_graph" alt="zabbix_graph"/>
+					    };
+					}
+					
+					$html .= qq{
+					    <br/><br/><p><b>Zabbix server</b></p>
+					    <img src="cid:$file_logo" width="$width_logo" height="$height_logo" alt="logo"/>
+					    </body>
+					    </html>
+					};
 
     &write_log_to_file('Create HTML successfully');
 
@@ -890,6 +902,7 @@ sub main
     #Logout
     &zabbix_logout;
 
+	#Send message
     &send_message($recipient, $from, $subject, $message, $graph_rnd);
 
     &write_log_to_file('============== END ==============');
