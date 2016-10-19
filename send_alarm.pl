@@ -8,9 +8,7 @@ use File::Basename;
 use POSIX;
 use Switch;
 use Cwd;
-
 use JSON::RPC::Client;
-use Data::Dumper;
 
 my $file_logo = 'logo.png';
 my $path_logo = '/usr/lib/zabbix/alertscripts/';
@@ -81,13 +79,13 @@ my %regex = (
 	trigger_description		=> '(?<=Trigger[\s*]description:)\s*(.*?)$',
 	trigger_template 		=> '(?<=Trigger[\s*]template:)\s*(.*?)$',
 	trigger_id 			=> '(?<=Trigger[\s*]ID:)\s*(.*?)$',
-	last_value 			=> '~ m/(?<=Last[\s*]value:)\s*(.*?)$/sm'
+	last_value 			=> '(?<=Last[\s*]value:)\s*(.*?)$'
 );
-#~ m/(?<=Last[\s*]value:)\s*(.*?)$/sm
+
 use constant
 {
 	MAX_LOG_SIZE 	=> 10,		#MB
-	PERIOD 		=> 3600,	#3600 sec is 1 hour, 7200 is 2 hour
+	PERIOD 		=> 3600,	#3600 sec is 1 hour, 7200 sec is 2 hour
 	WIDTH_GRAPH 	=> 800,
 	HEIGHT_GRAPH 	=> 500,
 	WIDTH_LOGO 	=> 100,
@@ -106,7 +104,6 @@ my $zabbix_password;
 my $language;
 
 my $authID;
-my $url;
 
 my $host_name;
 my $host_ip;
@@ -344,7 +341,7 @@ sub zabbix_auth
 
     &write_log_to_file("API* Authentication successful.Auth ID: $authID");
 
-    #undef $response;
+    undef $response;
 
     return $authID;
 }
@@ -373,7 +370,7 @@ sub zabbix_logout
 	exit 1;
     }
 
-    #undef $response;
+    undef $response;
 
     &write_log_to_file("API* Logout successful. Auth ID: $authID");
 }
@@ -409,7 +406,7 @@ sub zabbix_get_hostid
 	exit 1;
     }
 
-    foreach my $host(@{$response->content->{result}}) 
+    foreach my $host(@{$response->content->{result}})
     {
 	$host_id = $host->{hostid};
     }
@@ -455,7 +452,7 @@ sub get_graphs_count
 
     &write_log_to_file("API* Graphs count: $graphs_count");
 
-    #undef $response;
+    undef $response;
 
 }
 
@@ -505,7 +502,7 @@ sub get_graphs
 	}
     }
 
-    #($response, $graph_name) = ();
+    ($response, $graph_name) = ();
 }
 
 ################################################################################
@@ -552,7 +549,7 @@ sub get_items_with_triggers
 	}
     }
 
-    #undef $response;
+    undef $response;
 }
 
 ################################################################################
@@ -597,7 +594,7 @@ sub get_items_from_graphs
 	}
     }
 
-    #undef $response;
+    undef $response;
 }
 
 ################################################################################
@@ -633,24 +630,23 @@ sub get_items_from_graphs_with_triggers
 	exit 1;
     }
 
-    #$graph_rnd = &get_random_prefix();
-
-    foreach my $triggers(@{$response->content->{result}}) 
+    foreach my $triggers(@{$response->content->{result}})
     {
-	foreach my $trigger(@{$triggers->{triggers}}) 
+	foreach my $trigger(@{$triggers->{triggers}})
 	{
-	    $triggerid = $trigger->{triggerid};	
-	    &write_log_to_file("\t\t\t||| $i) Trigger ID: $trigger->{triggerid} | Trigger name: $trigger->{description}");
+	    $triggerid = $trigger->{triggerid};
+	    #&write_log_to_file("\t\t\t||| $i) Trigger ID: $trigger->{triggerid} | Trigger name: $trigger->{description}");
 
-	    if ($trigger_id == $triggerid) 
+	    if ($trigger_id == $triggerid)
 	    {
+		$graph_rnd = &get_random_prefix();
 		&download_graph($graph_rnd, $graph_id);
 	    }
 	    $i++;
 	}
     }
 
-    #($json, $response) = ();
+    ($json, $response) = ();
 }
 
 ################################################################################
@@ -728,6 +724,7 @@ sub send
 {
     my $json = shift;
     my $response;
+    my $url = "http://$zabbix_server/api_jsonrpc.php";
     my $client = new JSON::RPC::Client;
 
     $response = $client->call($url, $json);
@@ -863,7 +860,6 @@ sub parse_argv
 
 	#Item
 	if ($parameter =~ m/(?<=Last[\s*]value:)\s*(.*?)$/sm)
-	#if ($parameter = $regex{last_value})
 	{
 	    $item_last = &trim($1);
 	    &write_log_to_file("Parameter* last value => $item_last");
@@ -880,13 +876,9 @@ sub main
 
     print $current_path;
 
-    &write_log_to_file("============= START =============");
+    &write_log_to_file('============= START =============');
 
     &parse_argv();
-
-    $url = "http://$zabbix_server/api_jsonrpc.php";
-
-    $graph_rnd = &get_random_prefix();
 
     #Auth
     &zabbix_auth();
@@ -900,5 +892,5 @@ sub main
 
     &send_message($recipient, $from, $subject, $message, $graph_rnd);
 
-    &write_log_to_file("============== END ==============");
+    &write_log_to_file('============== END ==============');
 }
