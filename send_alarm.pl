@@ -205,47 +205,47 @@ sub create_html
 					<body>
 						<table border="1">
 						<tr>
-							<td>$field_description{$language}{host_name}</td>
+							<td>$field_description{$language}{'host_name'}</td>
 							<td>$host_name</td>
 						</tr>
 						<tr>
-							<td>$field_description{$language}{host_alias}</td>
+							<td>$field_description{$language}{'host_alias'}</td>
 							<td>$host_alias</td>
 						</tr>
 						<tr>
-							<td>$field_description{$language}{host_ip}</td>
+							<td>$field_description{$language}{'host_ip'}</td>
 							<td>$host_ip</td>
 						</tr>
 						<tr>
-							<td>$field_description{$language}{host_description}</td>
+							<td>$field_description{$language}{'host_description'}</td>
 							<td>$host_description</td>
 						</tr>
 						<tr>
-							<td>$field_description{$language}{trigger_name}</td>
+							<td>$field_description{$language}{'trigger_name'}</td>
 							<td>$trigger_name</td>
 						</tr>
 						<tr bgcolor="$color_trigger_value">
-							<td>$field_description{$language}{trigger_status}</td>
+							<td>$field_description{$language}{'trigger_status'}</td>
 							<td>$trigger_status</td>
 						</tr>
 						<tr bgcolor="$color_trigger_severity">
-							<td>$field_description{$language}{trigger_severity}</td>
+							<td>$field_description{$language}{'trigger_severity'}</td>
 							<td>$trigger_severity</td>
 						</tr>
 						<tr>
-							<td>$field_description{$language}{trigger_expression}</td>
+							<td>$field_description{$language}{'trigger_expression'}</td>
 							<td>$trigger_expression</td>
 						</tr>
 						<tr>
-							<td>$field_description{$language}{trigger_description}</td>
+							<td>$field_description{$language}{'trigger_description'}</td>
 							<td>$trigger_description</td>
 						</tr>
 						<tr>
-							<td>$field_description{$language}{trigger_template}</td>
+							<td>$field_description{$language}{'trigger_template'}</td>
 							<td>$trigger_template</td>
 						</tr>
 						<tr>
-							<td>$field_description{$language}{item_last}</td>
+							<td>$field_description{$language}{'item_last'}</td>
 							<td>$item_last</td>
 						</tr>
 					</table>
@@ -349,7 +349,7 @@ sub zabbix_auth
 	exit 1;
     }
 
-    $authID = $response->content->{result};
+    $authID = $response->content->{'result'};
 
     &write_log_to_file("API* Authentication successful.Auth ID: $authID");
 
@@ -418,9 +418,9 @@ sub zabbix_get_hostid
 	exit 1;
     }
 
-    foreach my $host(@{$response->content->{result}})
+    foreach my $host(@{$response->content->{'result'}})
     {
-	$host_id = $host->{hostid};
+	$host_id = $host->{'hostid'};
     }
 
     &write_log_to_file("API* Host ID: $host_id");
@@ -460,7 +460,7 @@ sub get_graphs_count
 	exit 1;
     }
 
-    $graphs_count = $response->content->{result};
+    $graphs_count = $response->content->{'result'};
 
     &write_log_to_file("API* Graphs count: $graphs_count");
 
@@ -503,13 +503,13 @@ sub get_graphs
 
     &write_log_to_file("API* Graphs for $host_name:");
 
-    foreach my $graphs(@{$response->content->{result}}) 
+    foreach my $graphs(@{$response->content->{'result'}}) 
     {
-	foreach my $graph(@{$graphs->{graphs}}) 
+	foreach my $graph(@{$graphs->{'graphs'}}) 
 	{
-	    $graph_id = $graph->{graphid}; 
-	    &write_log_to_file("\t| $i) Graph ID: $graph->{graphid} | Graph name: $graph->{name}");
-	    &get_items_from_graphs($graph->{graphid});
+	    $graph_id = $graph->{'graphid'}; 
+	    &write_log_to_file("\t| $i) Graph ID: $graph->{'graphid'} | Graph name: $graph->{'name'}");
+	    &get_items_from_graphs($graph->{'graphid'});
 	    $i++;
 	}
     }
@@ -552,11 +552,11 @@ sub get_items_with_triggers
 
     &write_log_to_file("API* Item with triggers for $host_name:");
 
-    foreach my $items(@{$response->content->{result}}) 
+    foreach my $items(@{$response->content->{'result'}}) 
     {
-	foreach my $item(@{$items->{triggers}}) 
+	foreach my $item(@{$items->{'triggers'}}) 
 	{
-	    &write_log_to_file("\t| $i) Trigger ID: $item->{triggerid} | Trigger name: $item->{description}");
+	    &write_log_to_file("\t| $i) Trigger ID: $item->{'triggerid'} | Trigger name: $item->{'description'}");
 	    $i++;
 	}
     }
@@ -596,12 +596,12 @@ sub get_items_from_graphs
 	exit 1;
     }
 
-    foreach my $items(@{$response->content->{result}}) 
+    foreach my $items(@{$response->content->{'result'}}) 
     {
 	foreach my $item(@{$items->{items}}) 
 	{
-	    &write_log_to_file("\t\t|| $i) Item ID: $item->{itemid} | Item name: $item->{name}");
-	    &get_items_from_graphs_with_triggers($item->{itemid});
+	    &write_log_to_file("\t\t|| $i) Item ID: $item->{'itemid'} | Item name: $item->{'name'}");
+	    &get_items_from_graphs_with_triggers($item->{'itemid'});
 	    $i++;
 	}
     }
@@ -642,12 +642,12 @@ sub get_items_from_graphs_with_triggers
 	exit 1;
     }
 
-    foreach my $triggers(@{$response->content->{result}})
+    foreach my $triggers(@{$response->content->{'result'}})
     {
-	foreach my $trigger(@{$triggers->{triggers}})
+	foreach my $trigger(@{$triggers->{'triggers'}})
 	{
 	    $triggerid = $trigger->{triggerid};
-	    #&write_log_to_file("\t\t\t||| $i) Trigger ID: $trigger->{triggerid} | Trigger name: $trigger->{description}");
+	    #&write_log_to_file("\t\t\t||| $i) Trigger ID: $trigger->{'triggerid'} | Trigger name: $trigger->{'description'}");
 
 	    if ($trigger_id == $triggerid)
 	    {
@@ -902,7 +902,7 @@ sub main
     #Logout
     &zabbix_logout;
 
-	#Send message
+    #Send message
     &send_message($recipient, $from, $subject, $message, $graph_rnd);
 
     &write_log_to_file('============== END ==============');
