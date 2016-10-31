@@ -1,4 +1,4 @@
-# Zabbix alarm with graph
+# Zabbix alarm with graph for Zabbix 3.x
 
 Sometimes I need to see a graph to understand the problem
 
