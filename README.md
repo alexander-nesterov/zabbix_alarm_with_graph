@@ -15,3 +15,8 @@ Sometimes I need to see a graph to understand the problem
 ![zabbix_settings](https://cloud.githubusercontent.com/assets/12140221/19526427/a1a02be8-964e-11e6-85c7-6253a5fd74f3.PNG)
 
 ![send_alarm_action](https://cloud.githubusercontent.com/assets/12140221/19836970/b4e96b0e-9ea7-11e6-92ea-3468bcbbe20f.PNG)
+
+- default path for script:
+
+/usr/lib/zabbix/alertscripts
+
